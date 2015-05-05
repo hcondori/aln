@@ -11,6 +11,7 @@ add_executable(aln aln.cpp
                    fastareader.cpp
                    #sequence.cpp
                    #sequencebuffer.cpp
+                   sw.cpp
                    avx2_sw.cpp
                    avx2_swi.cpp
                    backtrack.cpp

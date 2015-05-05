@@ -57,6 +57,7 @@ int main(int argc, char* argv[])
       ("mismatch,m", po::value<float>(), "mismatch penalty")
       ("fraction,f", po::value<float>(), "table percentage to analize")
       ("datatype,d", po::value<std::string>(), "datatype to perform the alignment")
+      ("sisd,s", po::bool_switch()->default_value(false), "run in sisd mode");
   ;
 
   po::variables_map vm;
@@ -82,6 +83,7 @@ int main(int argc, char* argv[])
   float mismatch = -4.0f;
   float fraction = 1.0f;
   std::string datatype = "float";
+  bool do_sisd = vm["sisd"].as<bool>();
   
   if (vm.count("gapopen"))
     gapopen = vm["gapopen"].as<float>();
@@ -113,7 +115,9 @@ int main(int argc, char* argv[])
   
   aln::CPUDispatcher dispatcher(filename1, filename2, outfilename);
   
-  if(datatype == "float")
+  if(do_sisd)
+    dispatcher.run_sisd(gapopen, gapextend, sm);
+  else if(datatype == "float")
   {
     if(with_sm)
       dispatcher.run(gapopen, gapextend, sm, fraction);

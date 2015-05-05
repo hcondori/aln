@@ -49,6 +49,7 @@ namespace aln
     CPUDispatcher(std::string filename1, std::string filename2);
     CPUDispatcher(std::string filename1, std::string filename2, std::string outfilename);
     //~CPUDispatcher(){};
+    void run_sisd(float gap_open, float gap_extend, float* sm);
     void run(float gap_open, float gap_extend, float* sm, float table_fraction = 1.0f);
     void run(float gap_open, float gap_extend, float match, float mismatch, float table_fraction = 1.0f);
     void run(int16_t gap_open, int16_t gap_extend, int16_t match, 

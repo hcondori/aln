@@ -441,20 +441,20 @@ avx2_fill_table_16_to_16_i16(char* flags, int16_t* seqs1, int16_t* seqs2, int x,
       
   for (int i = 1; i < x; i++)
   {
-    s1 = _mm256_stream_load_si256 ((__m256i *) (seqs1 + 16 * (i - 1)));
+    s1 = _mm256_load_si256 ((__m256i *) (seqs1 + 16 * (i - 1)));
     E = _mm256_set1_epi16 (-inf);
     H_diag = _mm256_setzero_si256 ();
     H = _mm256_setzero_si256 ();
     memset (flags + 16 * i * y, 0, 16);
     for (int j = 1; j < y; j++)
       {
-        s2 = _mm256_stream_load_si256 ((__m256i *) (seqs2 + 16 * (j - 1)));
+        s2 = _mm256_load_si256 ((__m256i *) (seqs2 + 16 * (j - 1)));
         temp = _mm256_and_si256( _mm256_cmpeq_epi16 (s1, vzero),
                                  _mm256_cmpeq_epi16 (s2, vzero));
         temp = _mm256_andnot_si256(temp, _mm256_cmpeq_epi16 (s1, s2));
         score = _mm256_blendv_epi8 (vmismatch, vmatch, temp);
         
-        H_left = _mm256_stream_load_si256 (aH + j);
+        H_left = _mm256_load_si256 (aH + j);
         diag = _mm256_add_epi16 (H_diag, score);
         H_diag = H_left;
 
@@ -462,7 +462,7 @@ avx2_fill_table_16_to_16_i16(char* flags, int16_t* seqs1, int16_t* seqs2, int x,
         E = _mm256_sub_epi16 (H, vopen);              //for now, H is H_up
         E = _mm256_max_epi16 (E, E_sub);
 
-        F_sub = _mm256_stream_load_si256 (aF + j);
+        F_sub = _mm256_load_si256 (aF + j);
         F_sub = _mm256_sub_epi16 (F_sub, vextend);
         F = _mm256_sub_epi16 (H_left, vopen);
         F = _mm256_max_epi16 (F, F_sub);
@@ -503,7 +503,7 @@ avx2_fill_table_16_to_16_i16(char* flags, int16_t* seqs1, int16_t* seqs2, int x,
         vflag = _mm256_packs_epi16 (vflag, vflag);
         vflag = _mm256_permute4x64_epi64 (vflag, 0b10001000);
         _mm256_store_si256 (&flag, vflag);
-        memcpy(flags + 16 * (y * i + j), &flag, 16);
+        //memcpy(flags + 16 * (y * i + j), &flag, 16);
 
         temp = _mm256_cmpgt_epi16 (H, max);
         imax = _mm256_blendv_epi8 (imax, _mm256_set1_epi16 (i), temp);

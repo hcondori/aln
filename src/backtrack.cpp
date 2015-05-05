@@ -84,58 +84,5 @@ sw_backtrack (int index, int* flags, int* a, int* b, int w, int h,
   aln1[c] = '\0';
   aln2[c] = '\0';
   inplace_reverse (aln1);
-  inplace_reverse (aln2);
-  
-}
-
-
-void
-sw_backtrack (int index, char* flags, int16_t* a, int16_t* b, int w, int h,
-              char* aln1, char* aln2, int16_t x, int16_t y, int16_t* x0, 
-              int16_t* y0, int buffer_width)
-{
-  char d_mask  = 0b00001100; //diagonal
-  char bl_mask = 0b00001000; //begin left
-  char bu_mask = 0b00000100; //begin up
-  char cl_mask = 0b00000010; //continue left
-  char cu_mask = 0b00000001; //continue up
-
-  char flag;
-  int c = 0;
-
-  while (((flag = flags[buffer_width * (x * h + y) + index]) & d_mask))
-  {
-    if ((flag & d_mask) == d_mask)
-    {
-      aln1[c] = a[(--x) * buffer_width + index];
-      aln2[c] = b[(--y) * buffer_width + index];
-      c++;
-    }
-    else if (flag & bl_mask)
-    {
-      do
-      {
-        aln1[c] = a[(x - 1) * buffer_width + index];
-        aln2[c] = '-';
-        c++;
-      }
-      while (flags[buffer_width * ((x--) * h + y) + index] & cl_mask);
-    }
-    else
-    {
-      do
-      {
-        aln1[c] = '-';
-        aln2[c] = b[(y - 1) * buffer_width + index];
-        c++;
-      }
-      while (flags[buffer_width * (x * h + (y--)) + index] & cu_mask);
-    }
-  }
-  *x0 = (int) (x + 1);
-  *y0 = (int) (y + 1);
-  aln1[c] = '\0';
-  aln2[c] = '\0';
-  inplace_reverse (aln1);
   inplace_reverse (aln2);  
 }
