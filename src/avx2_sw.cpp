@@ -152,7 +152,7 @@ avx2_fill_table_8_to_8_f32(int* flags, int* __restrict seqs1,
 
         //********FLAGS********
         diff = _mm256_sub_ps (E, E_sub);
-        diff = _mm256_and_ps (diff, vmask);	//absolute value
+        diff = _mm256_and_ps (diff, vmask);  //absolute value
         c_up = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ); // E[i,j] == E[i,j-1]-gap_extent ?
         flag = _mm256_movemask_ps (c_up); // & h_eq_e;		//c_up
 
@@ -202,6 +202,11 @@ avx2_fill_table_8_to_8_f32 (int* flags, int* __restrict seqs1, int* __restrict  
           float gap_extend, float* __restrict max_score, int* __restrict ipos,
           int* __restrict jpos)
 {
+  __m256 vmask1 = _mm256_castsi256_ps(_mm256_set1_epi16 (1));
+  __m256 vmask2 = _mm256_castsi256_ps(_mm256_set1_epi16 (2));
+  __m256 vmask4 = _mm256_castsi256_ps(_mm256_set1_epi16 (4));
+  __m256 vmask8 = _mm256_castsi256_ps(_mm256_set1_epi16 (8));
+  
   int mask = 0x7FFFFFFF;
   __m256 vmask = _mm256_castsi256_ps (_mm256_set1_epi32 (mask));
   __m256i s1, s2, temp_index, index;
@@ -217,8 +222,22 @@ avx2_fill_table_8_to_8_f32 (int* flags, int* __restrict seqs1, int* __restrict  
   __m256 E, E_sub;
   __m256 F, F_sub;
   __m256 diag, score, H, H_diag, H_left, temp;
-  __m256 c_up, c_left, b_up, b_left, H_eq_diag, H_eq_E, H_eq_F, H_ne_E;
-  int flag, h_eq_d, h_eq_e, h_ne_e, h_eq_f, h_gt_0;
+  __m256 c_up, c_left, b_up, b_left, H_gt_0, H_eq_diag, H_eq_E, H_eq_F, H_ne_E;
+  __m256 vflag;
+  __m256i vflagi;
+  int flag;
+  __m256i sh_mask = _mm256_set_epi8(0x00, 0xFF, 0xFF, 0xFF, 
+                                    0x04, 0xFF, 0xFF, 0xFF, 
+                                    0x08, 0xFF, 0xFF, 0xFF, 
+                                    0x0C, 0xFF, 0xFF, 0xFF,
+                                    0x00, 0xFF, 0xFF, 0xFF, 
+                                    0x04, 0xFF, 0xFF, 0xFF,
+                                    0x08, 0xFF, 0xFF, 0xFF, 
+                                    0x0C, 0xFF, 0xFF, 0xFF
+                                   );
+  __m256i perm_mask = _mm256_set_epi32(0x0000, 0x0004, 0x0000, 0x0000, 
+                                       0x0000, 0x0000, 0x0000, 0x0000);
+  int h_eq_d, h_eq_e, h_ne_e, h_eq_f, h_gt_0;
 
   memset (flags, 0, y * sizeof(int));
   
@@ -249,10 +268,12 @@ avx2_fill_table_8_to_8_f32 (int* flags, int* __restrict seqs1, int* __restrict  
                      vzero,vopen, vextend,score, j);
 
         //logic tests
-
+        
+        //logic tests
+        
         diff = _mm256_sub_ps (H, vzero);
         h_gt_0 = _mm256_movemask_ps (
-            _mm256_cmp_ps(diff, vepsilon, _CMP_GT_OQ));
+          _mm256_cmp_ps(diff, vepsilon, _CMP_GT_OQ));
         diff = _mm256_sub_ps (H, E);
         diff = _mm256_and_ps (diff, vmask);	//absolute value
         H_eq_E = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ);
@@ -263,28 +284,29 @@ avx2_fill_table_8_to_8_f32 (int* flags, int* __restrict seqs1, int* __restrict  
         h_eq_f = _mm256_movemask_ps (H_eq_F);
 
         //********FLAGS********
+        
         diff = _mm256_sub_ps (E, E_sub);
-        diff = _mm256_and_ps (diff, vmask);	//absolute value
+        diff = _mm256_and_ps (diff, vmask);  //absolute value
         c_up = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ); // E[i,j] == E[i,j-1]-gap_extent ?
         flag = _mm256_movemask_ps (c_up); // & h_eq_e;		//c_up
-
+        
         diff = _mm256_sub_ps (F, F_sub);
         diff = _mm256_and_ps (diff, vmask);	//absolute value
         c_left = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ); // F[i,j] == F[i-1,j]-gap_extent ?
         flag <<= 8;
         flag |= _mm256_movemask_ps (c_left); // & h_eq_f;		//c_left
-
+        
         diff = _mm256_sub_ps (H, diag);
         diff = _mm256_and_ps (diff, vmask);	//absolute value
         H_eq_diag = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ);
         h_eq_d = _mm256_movemask_ps (H_eq_diag);
         flag <<= 8;
         flag |= (h_eq_e | h_eq_d) & h_gt_0; //b_up
-
+        
         //b_left
         flag <<= 8;
         flag = flag | (((h_eq_f & ~h_eq_e) | h_eq_d) & h_gt_0);
-
+        
         flags[y * i + j] = flag;
 
         diff = _mm256_sub_ps (H, max);
@@ -555,4 +577,51 @@ avx2_fill_table_8_to_8_f32 (int* __restrict flags, int* __restrict seqs1,
   H = _mm256_max_ps (H, diag);
   H = _mm256_max_ps (H, vzero);
   _mm256_store_ps (aH + 8 * j, H);
+ */
+
+
+/*
+ diff = _mm256_sub_ps (E, E_sub);                  *
+ diff = _mm256_and_ps (diff, vmask);	//absolute value
+ c_up = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ); // E[i,j] == E[i,j-1]-gap_extent ?
+ vflag = _mm256_and_ps(c_up, vmask1);
+ 
+ diff = _mm256_sub_ps (F, F_sub);
+ diff = _mm256_and_ps (diff, vmask);	//absolute value
+ c_left = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ); // F[i,j] == F[i-1,j]-gap_extent ?
+ temp = _mm256_and_ps(c_left, vmask2);
+ vflag = _mm256_or_ps(vflag, temp);
+ 
+ //b_up
+ diff = _mm256_sub_ps (H, diag);
+ diff = _mm256_and_ps (diff, vmask); //absolute value
+ H_eq_diag = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ);
+ temp = _mm256_or_ps(H_eq_E, H_eq_diag);
+ temp = _mm256_and_ps(temp, H_gt_0);
+ temp = _mm256_and_ps(temp, vmask4);
+ vflag = _mm256_or_ps(vflag, temp);
+ 
+ //b_left
+ temp = _mm256_andnot_ps(H_eq_E, H_eq_F);
+ temp = _mm256_or_ps(temp, H_eq_diag);
+ temp = _mm256_and_ps(temp, H_gt_0);
+ temp = _mm256_and_ps(temp, vmask8);
+ vflag = _mm256_or_ps(vflag, temp);
+ 
+ vflagi = _mm256_shuffle_epi8(_mm256_castps_si256(vflag), sh_mask);
+ vflagi = _mm256_permutevar8x32_epi32(vflagi, perm_mask);
+ _mm256_store_si256(&flag, vflagi);
+ 
+ memcpy(flags + 8 * (y * i + j), &flag, 1);
+ */
+
+/*
+ d iff = _mm256_sub_ps (H, vzero);
+ H_gt_0 = _mm256_cmp_ps(diff, vepsilon, _CMP_GT_OQ);
+ diff = _mm256_sub_ps (H, E);
+ diff = _mm256_and_ps (diff, vmask); //absolute value
+ H_eq_E = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ);        
+ diff = _mm256_sub_ps (H, F);
+ diff = _mm256_and_ps (diff, vmask); //absolute value
+ H_eq_F = _mm256_cmp_ps(diff, vepsilon, _CMP_LT_OQ);
  */

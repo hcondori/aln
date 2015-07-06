@@ -98,6 +98,110 @@ print_alignment (std::ostream& out, aln::Batch<T1, T2>& batch,
   free (matches);
 }
 
+void
+print_alignment (std::ostream& out, char* ids1, char* ids2, 
+                 float* scores, char* aln1, char* aln2,
+                 int aln_len, int index)
+{
+  //out.precision(1);
+  int wrap = 50;
+  int gaps;
+  char* matches = (char*) malloc ((aln_len + 1) * sizeof(char));
+  matches[aln_len] = '\0';
+  gen_aln (aln_len, aln1, aln2, matches, &gaps);
+  
+  out << "#=======================================\n";
+  out << "# a: " << ids1 + 128 * index << "\n";
+  out << "# b: " << ids2 + 128 * index << "\n";
+  
+  //out << batch.ipos()[index] << std::endl;
+  //out << batch.jpos()[index] << std::endl;;
+  
+  //fprintf (f, "# Length: %d\n", aln->aln_len);
+  //fprintf (f, "# Gaps:     %d/%d (%.1f%%)\n", gaps, aln->aln_len,
+  //((float) gaps / (float) aln->aln_len) * 100);
+  
+  out << "# Score:    " << scores[index] << std::endl;
+  out << "#=======================================\n\n\n";
+  
+  int len = aln_len;
+  int n = (len + wrap - 1) / wrap;
+  char buff[wrap + 1];
+  int m;
+  int offset = 0;
+  
+  for (int i = 0; i < n; i++)
+  {
+    out << "a: ";
+    m = std::min(wrap, len - offset);
+    buff[m] = '\0';
+    
+    memcpy(buff, aln1 + offset, m);
+    out << buff << "\n   ";
+    
+    memcpy(buff, matches + offset, m);
+    out << buff << "\nb: ";
+    
+    memcpy(buff, aln2 + offset, m);    
+    out << buff << "\n\n";
+    offset += wrap;
+  }
+  out << "\n\n";
+  free (matches);
+}
+
+
+void
+print_alignment (FILE* file, char* ids1, char* ids2, 
+                 float* scores, char* aln1, char* aln2,
+                 int aln_len, int index)
+{
+  int wrap = 50;
+  int gaps;
+  char* matches = (char*) malloc ((aln_len + 1) * sizeof(char));
+  matches[aln_len] = '\0';
+  gen_aln (aln_len, aln1, aln2, matches, &gaps);
+  
+  flockfile(file);
+  fputs("#=======================================\n", file);
+  fprintf(file, "# a: %s\n", ids1 + 128 * index);
+  fprintf(file, "# b: %s\n", ids2 + 128 * index);
+   
+  
+  //fprintf (f, "# Length: %d\n", aln->aln_len);
+  //fprintf (f, "# Gaps:     %d/%d (%.1f%%)\n", gaps, aln->aln_len,
+  //((float) gaps / (float) aln->aln_len) * 100);
+  
+  fprintf(file, "# Score:    %f\n", scores[index]);
+  fputs("#=======================================\n\n", file);
+  
+  int len = aln_len;
+  int n = (len + wrap - 1) / wrap;
+  char buff[wrap + 1];
+  int m;
+  int offset = 0;
+  
+  for (int i = 0; i < n; i++)
+  {
+    m = std::min(wrap, len - offset);
+    
+    fwrite("a: ", 1, 3, file);
+    
+    fwrite(aln1 + offset, 1, m, file);
+    fwrite("\n   ", 1, 4, file);
+    
+    fwrite(matches + offset, 1, m, file);
+    fwrite("\nb: ",1, 4, file);
+    
+    fwrite(aln2 + offset, 1, m, file);    
+    fputs("\n\n", file);
+    
+    offset += wrap;
+  }
+  fputs("\n\n", file);
+  funlockfile(file);
+  free (matches);
+}
 
 
 #endif /* PRINTER_H_ */

@@ -40,7 +40,7 @@ inplace_reverse (char* str)
  */
 void
 sw_backtrack (int index, int* flags, int* a, int* b, int w, int h,
-              char* aln1, char* aln2, int x, int y, int* x0, int* y0, int buffer_width)
+              char* aln1, char* aln2, int x, int y, int& x0, int& y0, int buffer_width)
 {
   int d_mask  = 0x00000101 << index; //diagonal
   int bl_mask = 0x00000001 << index; //begin left
@@ -79,8 +79,8 @@ sw_backtrack (int index, int* flags, int* a, int* b, int w, int h,
       while (flags[x * h + (y--)] & cu_mask);
     }
   }
-  *x0 = (int) (x + 1);
-  *y0 = (int) (y + 1);
+  x0 = x + 1;
+  y0 = y + 1;
   aln1[c] = '\0';
   aln2[c] = '\0';
   inplace_reverse (aln1);

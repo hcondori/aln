@@ -1,0 +1,45 @@
+ALN README
+
+Welcome to ALN!
+
+ALN is a pairwise sequence aligner.
+
+
+CONTACT
+------- 
+  You can contact any of the following developers:
+
+    * Héctor Condori Alagón (hca777@gmail.com)
+
+
+DOWNLOAD and BUILDING
+---------------------
+
+  ALN is available in in GitHub, so you can download by invoking the following commands:
+
+    $ git clone https://github.com/hcondori/aln.git
+    
+   In Ubuntu and Debian distributions, you can install dependencies by using theses commands:
+    
+    $ apt-get install git 
+    $ apt-get install g++
+    $ apt-get install cmake
+    $ apt-get install libboost-program-options-dev
+
+  
+  Finally, use CMake to build ALN:
+
+    $ cmake .
+    $ make
+
+RUNING
+-------
+
+  For command line options invoke:
+
+    $ ./src/aln -h
+
+
+  In order align sequences, invoke:
+
+      $./src/aln -a file1.fasta -b file2.fasta -o out.txt

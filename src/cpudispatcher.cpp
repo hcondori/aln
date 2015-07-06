@@ -8,6 +8,7 @@
 #include "cpudispatcher.hpp"
 #include "backtrack.hpp"
 #include "printer.hpp"
+#include "sequencebuffer.hpp"
 
 #include "sw.hpp"
 #ifdef __AVX2__
@@ -89,61 +90,78 @@ void aln::CPUDispatcher::run(float gap_open, float gap_extend, float* sm, float 
   int m;
   int s = 0;
   #pragma omp parallel
-  {        
+  {
+    int buffer_max_length = 1024 * 8;
     float band_offset = 1.0f - sqrt(1.0f - table_fraction);
     int c;
     int pair_count = 0;
     float* aF = (float*) aligned_alloc (32, 8 * 256 * sizeof(float));
     float* aH = (float*) aligned_alloc (32, 8 * 256 * sizeof(float));
-    int* flags = (int*) malloc (256 * 256 * sizeof(int));
+    //int* flags = (int*) malloc (256 * 256 * sizeof(int));
+    //char* flagsi = (char*) malloc (8 * 256 * 256 * sizeof(char));
+    Buffer<int> flags(256 *256, 32);
     char aln1[2 * 256 + 1];
     char aln2[2 * 256 + 1];
     int x0, y0;
-    aln::Batch<int, float> batch(8, 256);
+
+    Buffer<float> scores(8, 32);
+    Buffer<int> ipos(8, 32);
+    Buffer<int> jpos(8, 32);
+    aln::SequenceBuffer<int> buffer1(8, buffer_max_length);
+    aln::SequenceBuffer<int> buffer2(8, buffer_max_length);
+    
+    //FILE* file = fopen("test2", "w");
+    
     std::stringstream strbuffer;
     while(true)
     {
       #pragma omp critical
       {
-        c = batch.fill(this->reader1_, this->reader2_);
+        //c = batch.fill(this->reader1_, this->reader2_);
+        c = std::max(buffer1.fill(this->reader1_), 
+                     buffer2.fill(this->reader2_));
       }
       
       if(c == 0)
         break;
       pair_count += c;  
       if(table_fraction == 1.0f)
-        avx2_fill_table_8_to_8_f32 (flags, batch.seqs1(), batch.seqs2(), 
-                                    batch.max_length1() + 1, 
-                                    batch.max_length2() + 1, 
+        avx2_fill_table_8_to_8_f32 (flags.data(), buffer1.seqs(), buffer2.seqs(),
+                                    buffer1.max_length() + 1, 
+                                    buffer2.max_length() + 1, 
                                     sm, gap_open, gap_extend,
-                                    batch.scores(), batch.ipos(), batch.jpos()
-        );
+                                    scores.data(), ipos.data(), jpos.data()
+                                   );
       else
-        avx2_fill_table_8_to_8_f32 (flags, batch.seqs1(), batch.seqs2(), 
-                                    batch.max_length1() + 1, 
-                                    batch.max_length2() + 1, 
+        avx2_fill_table_8_to_8_f32 (flags.data(), buffer1.seqs(), buffer2.seqs(),
+                                    buffer1.max_length() + 1, 
+                                    buffer2.max_length() + 1, 
                                     sm, gap_open, gap_extend,
-                                    batch.scores(), batch.ipos(), batch.jpos(),
-                                    aF, aH, (int)(band_offset * (float)batch.max_length1())
+                                    scores.data(), ipos.data(), jpos.data(),
+                                    aF, aH, (int)(band_offset * (float)buffer1.max_length())
         );
+        
       
       for(int i = 0; i < 8; i++)
       {
-        sw_backtrack (i, flags, batch.seqs1(), batch.seqs2(), batch.max_length1() + 1, 
-                      batch.max_length2() + 1, aln1, aln2, 
-                      batch.ipos()[i], batch.jpos()[i], &x0, &y0, 8);
+        //printf("Score %i: %f\n", i, scores.data()[i]);
+        sw_backtrack(i, flags.data(), buffer1.seqs(), buffer2.seqs(), buffer1.max_length() + 1, 
+                      buffer2.max_length() + 1, aln1, aln2, 
+                      ipos.data()[i], jpos.data()[i], x0, y0, 8);
         
         
         int aln_len = strlen(aln1);
-        print_alignment (strbuffer, batch, aln1, aln2, aln_len, i);
         
-      }            
+        print_alignment (strbuffer, buffer1.ids(), buffer2.ids(), 
+                         scores.data(), aln1, aln2,
+                         aln_len, i);
+      }
       this->out_ << strbuffer.str();
       strbuffer.str(std::string());
     } //while
     free(aF);
     free(aH);
-    free(flags);
+    //free(flags);
   }     
 }
 
@@ -195,7 +213,7 @@ void aln::CPUDispatcher::run(float gap_open, float gap_extend, float match,
       {
         sw_backtrack (i, flags, batch.seqs1(), batch.seqs2(), batch.max_length1() + 1, 
                       batch.max_length2() + 1, aln1, aln2, 
-                      batch.ipos()[i], batch.jpos()[i], &x0, &y0, 8);
+                      batch.ipos()[i], batch.jpos()[i], x0, y0, 8);
         
         int aln_len = strlen(aln1);
         print_alignment (strbuffer, batch, aln1, aln2, aln_len, i);

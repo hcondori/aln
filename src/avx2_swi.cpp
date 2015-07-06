@@ -515,3 +515,122 @@ avx2_fill_table_16_to_16_i16(char* flags, int16_t* seqs1, int16_t* seqs2, int x,
   _mm256_store_si256 ((__m256i *) ipos, imax);
   _mm256_store_si256 ((__m256i *) jpos, jmax);
 }
+
+
+/*
+ * Smith-Waterman with match/mismatch values 1 to 31
+ */
+void
+avx2_fill_table_1_to_32_i8(char* flags, char* seqs1, char* seqs2, int x, int y,
+                           int8_t match, int8_t mismatch, int8_t gap_open,
+                           int8_t gap_extend, int8_t* scores,
+                           int* ipos, int* jpos)
+{
+  __m256i vmask1 = _mm256_set1_epi16 (1);
+  __m256i vmask2 = _mm256_set1_epi16 (2);
+  __m256i vmask4 = _mm256_set1_epi16 (4);
+  __m256i vmask8 = _mm256_set1_epi16 (8);
+  
+  __m256i s1, s2, temp_index, index;
+  __m256i vmatch = _mm256_set1_epi16 (match);
+  __m256i vmismatch = _mm256_set1_epi16 (mismatch);
+  __m256i vopen = _mm256_set1_epi16 (gap_open);
+  __m256i vextend = _mm256_set1_epi16 (gap_extend);
+  __m256i vzero = _mm256_setzero_si256 ();
+  __m256i imax = _mm256_setzero_si256 ();
+  __m256i jmax = _mm256_setzero_si256 ();
+  __m256i max = _mm256_setzero_si256 ();
+  __m256i E, E_sub;
+  __m256i F, F_sub;
+  __m256i diag, score, H, H_diag, H_left, temp;
+  __m256i c_up, c_left, b_up, b_left, H_gt_0, H_eq_diag, H_eq_E, H_eq_F, H_ne_E;
+  int inf = gap_open + gap_extend + 1;
+  //__m256i vminf = _mm256_set1_epi16(-inf);
+  __m256i vflag;
+  __m256i flag;// __attribute__((aligned(32)));
+  memset (flags, 0, 16 * y);
+  
+  __m256i aF[y];
+  __m256i aH[y];
+  for (int i = 0; i < y; i++)
+  {
+    aF[i] = _mm256_set1_epi16(-inf);
+    aH[i] = _mm256_setzero_si256();
+  }
+  
+  for (int i = 1; i < x; i++)
+  {
+    s1 = _mm256_load_si256 ((__m256i *) (seqs1 + 16 * (i - 1)));
+    E = _mm256_set1_epi16 (-inf);
+    H_diag = _mm256_setzero_si256 ();
+    H = _mm256_setzero_si256 ();
+    memset (flags + 16 * i * y, 0, 16);
+    for (int j = 1; j < y; j++)
+    {
+      s2 = _mm256_load_si256 ((__m256i *) (seqs2 + 16 * (j - 1)));
+      temp = _mm256_and_si256( _mm256_cmpeq_epi16 (s1, vzero),
+                               _mm256_cmpeq_epi16 (s2, vzero));
+      temp = _mm256_andnot_si256(temp, _mm256_cmpeq_epi16 (s1, s2));
+      score = _mm256_blendv_epi8 (vmismatch, vmatch, temp);
+      
+      H_left = _mm256_load_si256 (aH + j);
+      diag = _mm256_add_epi16 (H_diag, score);
+      H_diag = H_left;
+      
+      E_sub = _mm256_sub_epi16 (E, vextend);        //for now, E is E_up
+      E = _mm256_sub_epi16 (H, vopen);              //for now, H is H_up
+      E = _mm256_max_epi16 (E, E_sub);
+      
+      F_sub = _mm256_load_si256 (aF + j);
+      F_sub = _mm256_sub_epi16 (F_sub, vextend);
+      F = _mm256_sub_epi16 (H_left, vopen);
+      F = _mm256_max_epi16 (F, F_sub);
+      _mm256_store_si256 (aF + j, F);
+      
+      H = _mm256_max_epi16 (E, F);
+      H = _mm256_max_epi16 (H, diag);
+      H = _mm256_max_epi16 (H, vzero);
+      _mm256_store_si256 (aH + j, H);
+      
+      //logic tests
+      H_gt_0 = _mm256_cmpgt_epi16 (H, vzero);
+      H_eq_E = _mm256_cmpeq_epi16 (H, E);
+      H_eq_F = _mm256_cmpeq_epi16 (H, F);
+      H_eq_diag = _mm256_cmpeq_epi16 (H, diag);
+      
+      // ********FLAGS********
+      
+      c_up = _mm256_cmpeq_epi16 (E, E_sub); // E[i,j] == E[i,j-1]-gap_extent ?
+      vflag = _mm256_and_si256(c_up, vmask1);
+      
+      c_left = _mm256_cmpeq_epi16 (F, F_sub); // F[i,j] == F[i-1,j]-gap_extent ?
+      temp = _mm256_and_si256(c_left, vmask2);
+      vflag = _mm256_or_si256(vflag, temp);
+      
+      //b_up
+      temp = _mm256_and_si256(_mm256_or_si256(H_eq_E, H_eq_diag), H_gt_0);
+      temp = _mm256_and_si256(temp, vmask4);
+      vflag = _mm256_or_si256(vflag, temp);
+      
+      //b_left
+      temp = _mm256_andnot_si256(H_eq_E, H_eq_F);
+      temp = _mm256_or_si256(temp, H_eq_diag);
+      temp = _mm256_and_si256(temp, H_gt_0);
+      temp = _mm256_and_si256(temp, vmask8);
+      vflag = _mm256_or_si256(vflag, temp);
+      
+      vflag = _mm256_packs_epi16 (vflag, vflag);
+      vflag = _mm256_permute4x64_epi64 (vflag, 0b10001000);
+      _mm256_store_si256 (&flag, vflag);
+      //memcpy(flags + 16 * (y * i + j), &flag, 16);
+      
+      temp = _mm256_cmpgt_epi16 (H, max);
+      imax = _mm256_blendv_epi8 (imax, _mm256_set1_epi16 (i), temp);
+      jmax = _mm256_blendv_epi8 (jmax, _mm256_set1_epi16 (j), temp);
+      max = _mm256_max_epi16 (H, max);
+    }
+  }
+  _mm256_store_si256 ((__m256i *) scores, max);
+  _mm256_store_si256 ((__m256i *) ipos, imax);
+  _mm256_store_si256 ((__m256i *) jpos, jmax);
+}

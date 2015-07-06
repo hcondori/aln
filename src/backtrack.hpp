@@ -32,7 +32,7 @@ inplace_reverse (char* str);
 
 void
 sw_backtrack (int index, int* flags, int* a, int* b, int w, int h,
-              char* aln1, char* aln2, int x, int y, int* x0, int* y0, int buffer_width);
+              char* aln1, char* aln2, int x, int y, int& x0, int& y0, int buffer_width);
 
 void
 sw_backtrack (int index, char* flags, int16_t* a, int16_t* b, int w, int h,

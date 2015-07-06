@@ -25,42 +25,52 @@
 #include <cstdlib>
 #include <vector>
 
+#include "buffer.hpp"
+#include "fastareader.hpp"
 #include "sequence.hpp"
 
-class SequenceBuffer
+namespace aln
 {
-private:
-  const char* filename_;
-  FILE* file_;
-  char ch_;
-  int state_;
-  char* ids;
-  //char* buffer_;
-  //std::vector<char> buffer_;
-  int width_;
-  int length_;
-  int sequence_count_;
-  int sequence_size_;
-  int* sequence_sizes_;
-public:
-  char* buffer_;
-  SequenceBuffer(const char* filename, int width, int length);
-  ~SequenceBuffer();
-  bool fill();
-  void reset();
-  void write_char(char value, int seq, int pos);
-  void PrepareBuffers();
-  char get_char(int seq, int pos);
-  void add(Sequence* seq, int index);
-  char* id() { return this->ids; };
-  char* buffer() { return this->buffer_; };
-  size_t size() { return width_ * length_; };
-  size_t current_size() { return width_ * sequence_size_; };
-  int width() { return width_; };
-  int length() { return length_; };
-  int sequence_count() { return sequence_count_; };
-  int sequence_size() { return sequence_size_; };
-  int sequence_size(int i) { return sequence_sizes_[i]; };
-};
+  template<typename T>
+  class SequenceBuffer
+  {
+  private:
+    int width_;
+    int length_;
+    
+    aln::Buffer<T> seqs_;
+    char* ids_;
+    int max_length_;
+    int* lengths_;
+  public:
+    SequenceBuffer(int width, int length):
+      seqs_(width * length, 32)
+    {
+      this->width_ = width;
+      this->length_ = length;
+      this->lengths_ = (int*)calloc(width, sizeof(int));
+      this->ids_ = (char*)malloc(128 * width);
+    }
+    ~SequenceBuffer()
+    {
+      free(this->lengths_);
+      free(this->ids_);
+    }
+    
+    T* seqs() { return this->seqs_.data(); }
+    char* ids() { return this->ids_; }
+    int max_length() { return this->max_length_; }
+    
+    int fill(FASTAReader& reader)
+    {  
+      return reader.read(this->ids_, this->seqs_.data(), this->width_, 
+                         &this->max_length_, this->lengths_);
+      
+    }
+    
+  };
+  
+}
+
 
 #endif /* SEQUENCEBUFFER_HPP_ */
